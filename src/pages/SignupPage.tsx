@@ -3,7 +3,7 @@ import { useApp } from "../state/AppContext";
 import { AppLink, useRouter } from "../state/RouterContext";
 
 export function SignupPage() {
-  const { isAuthenticated, signup } = useApp();
+  const { isAuthenticated, authError, signup } = useApp();
   const { navigate } = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -11,10 +11,10 @@ export function SignupPage() {
 
   if (isAuthenticated) navigate("/");
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    signup(name);
-    navigate("/profile");
+    const ok = await signup(name, password);
+    if (ok) navigate("/profile");
   }
 
   return (
@@ -49,6 +49,7 @@ export function SignupPage() {
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
+          {authError ? <p className="form-error">{authError}</p> : null}
           <button className="primary-button" type="submit" disabled={!name || !email || !password}>
             Sign up
           </button>

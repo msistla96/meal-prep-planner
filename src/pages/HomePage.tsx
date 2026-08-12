@@ -35,8 +35,14 @@ export function HomePage() {
         </div>
         <div className="panel">
           <h2>Today&apos;s plan</h2>
-          <strong>{todayPlan.name}</strong>
-          <p>{todayPlan.meals.length} meals prepared for today.</p>
+          {todayPlan ? (
+            <>
+              <strong>{todayPlan.name}</strong>
+              <p>{todayPlan.meals.length} meals prepared for today.</p>
+            </>
+          ) : (
+            <p className="empty-state">No meal plans yet.</p>
+          )}
           <AppLink to="/meal-plans">View meal plans</AppLink>
         </div>
         <div className="panel">

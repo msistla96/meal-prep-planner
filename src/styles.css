@@ -219,6 +219,12 @@ button {
   font-weight: 700;
 }
 
+.form-error {
+  margin: 0;
+  color: #b3261e;
+  font-size: 0.9rem;
+}
+
 .form-stack,
 .form-grid,
 .item-form {
@@ -230,6 +236,37 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.item-rows {
+  display: grid;
+  gap: 12px;
+}
+
+.item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e4dfd5;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #cfc8bd;
+  border-radius: 6px;
+  background: white;
+  color: #697169;
+  cursor: pointer;
+}
+
+.existing-items table {
+  width: 100%;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -239,14 +276,17 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   min-width: 0;
   min-height: 38px;
   border: 1px solid #cfc8bd;
   border-radius: 6px;
   background: white;
   color: #1e2420;
-  padding: 0 10px;
+  padding: 8px 10px;
+  font: inherit;
+  resize: vertical;
 }
 
 .primary-button,
@@ -333,21 +373,6 @@ select {
   color: #697169;
 }
 
-.segmented {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-.segmented button {
-  text-transform: capitalize;
-}
-
-.segmented .active {
-  background: #315a46;
-  color: white;
-}
-
 .calendar-strip {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -363,6 +388,17 @@ select {
   border: 1px solid #d8d3ca;
   border-radius: 7px;
   background: #fbfaf7;
+  cursor: pointer;
+}
+
+.calendar-day.active {
+  background: #315a46;
+  border-color: #315a46;
+}
+
+.calendar-day.active span,
+.calendar-day.active strong {
+  color: white;
 }
 
 .calendar-day span {
@@ -377,6 +413,10 @@ select {
   background: #315a46;
 }
 
+.calendar-day.active i {
+  background: white;
+}
+
 .meal-panel {
   display: grid;
   gap: 14px;
@@ -387,23 +427,77 @@ select {
   gap: 14px;
 }
 
-.meal-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+.meal-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.meal-list div {
+.meal-edit-rows {
   display: grid;
-  gap: 4px;
+  gap: 16px;
+}
+
+.meal-edit-row {
+  display: grid;
+  gap: 12px;
   border: 1px solid #eee9df;
   border-radius: 7px;
   padding: 12px;
 }
 
-.meal-list span,
-.meal-list small {
+.plan-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.meal-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.meal-item-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #eee9df;
+  border-radius: 7px;
+  padding: 12px;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meal-item-card.expanded {
+  border-color: #315a46;
+  grid-column: 1 / -1;
+}
+
+.meal-item-card span,
+.meal-item-card small {
   color: #697169;
+}
+
+.meal-item-details {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.meal-item-details h4 {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+}
+
+.meal-item-details ul,
+.meal-item-details ol {
+  margin: 0;
+  padding-left: 18px;
+  color: #495049;
+  font-size: 0.85rem;
 }
 
 .row-actions,

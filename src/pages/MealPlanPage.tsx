@@ -1,13 +1,45 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
+import { CalendarStrip } from "../components/CalendarStrip";
+import { DraftMeal, MealPlanEditForm, fromDraftMeal, toDraftMeal } from "../components/MealPlanEditForm";
+import { MealPlanCard } from "../components/MealPlanCard";
 import { PageHeader } from "../components/PageHeader";
 import { useApp } from "../state/AppContext";
-import type { ViewMode } from "../types";
-
-const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+import type { MealPlan } from "../types";
 
 export function MealPlanPage() {
-  const { mealPlans, createMealPlan, deleteMealPlan } = useApp();
-  const [view, setView] = useState<ViewMode>("day");
+  const { mealPlans, createMealPlan, updateMealPlan, deleteMealPlan } = useApp();
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expandedMealId, setExpandedMealId] = useState<string | null>(null);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editMeals, setEditMeals] = useState<DraftMeal[]>([]);
+
+  const plansForDay = mealPlans.filter((plan) => plan.date === selectedDate);
+
+  function startEditing(plan: MealPlan) {
+    setEditingPlanId(plan.id);
+    setEditName(plan.name);
+    setEditDate(plan.date);
+    setEditMeals(plan.meals.map(toDraftMeal));
+  }
+
+  function updateEditMeal(mealId: string, key: keyof DraftMeal, value: string) {
+    setEditMeals((current) =>
+      current.map((meal) => (meal.id === mealId ? { ...meal, [key]: value } : meal))
+    );
+  }
+
+  function saveEdit(event: FormEvent, planId: string) {
+    event.preventDefault();
+    if (!editName.trim() || !editDate.trim()) return;
+    updateMealPlan(planId, {
+      name: editName.trim(),
+      date: editDate.trim(),
+      meals: editMeals.map(fromDraftMeal)
+    });
+    setEditingPlanId(null);
+  }
 
   return (
     <>
@@ -18,52 +50,44 @@ export function MealPlanPage() {
       </PageHeader>
       <section className="planner-layout">
         <div className="panel">
-          <div className="segmented" role="group" aria-label="Meal plan view">
-            {(["day", "week", "month"] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={view === mode ? "active" : ""}
-                onClick={() => setView(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          <div className="calendar-strip" aria-label="Calendar">
-            {days.map((day, index) => (
-              <div key={day} className="calendar-day">
-                <span>{day}</span>
-                <strong>{index + 2}</strong>
-                {index < 2 ? <i aria-label="meal planned" /> : null}
-              </div>
-            ))}
-          </div>
+          <CalendarStrip
+            selectedDate={selectedDate}
+            hasPlanOnDate={(date) => mealPlans.some((plan) => plan.date === date)}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setExpandedMealId(null);
+            }}
+          />
         </div>
         <section className="meal-panel">
-          {mealPlans.map((plan) => (
-            <article className="panel meal-card" key={plan.id}>
-              <div>
-                <span className="eyebrow">{plan.date}</span>
-                <h2>{plan.name}</h2>
-              </div>
-              <div className="meal-list">
-                {plan.meals.map((meal) => (
-                  <div key={meal.id}>
-                    <strong>{meal.name}</strong>
-                    <span>{meal.cuisine}</span>
-                    <small>{meal.servings} servings</small>
-                  </div>
-                ))}
-              </div>
-              <div className="row-actions">
-                <button type="button">Edit plan</button>
-                <button type="button" onClick={() => deleteMealPlan(plan.id)}>
-                  Delete plan
-                </button>
-              </div>
-            </article>
-          ))}
+          {plansForDay.length === 0 ? (
+            <p className="empty-state">No meal plans for this day.</p>
+          ) : (
+            plansForDay.map((plan) => (
+              <article className="panel meal-card" key={plan.id}>
+                {editingPlanId === plan.id ? (
+                  <MealPlanEditForm
+                    name={editName}
+                    date={editDate}
+                    meals={editMeals}
+                    onNameChange={setEditName}
+                    onDateChange={setEditDate}
+                    onMealChange={updateEditMeal}
+                    onSubmit={(event) => saveEdit(event, plan.id)}
+                    onCancel={() => setEditingPlanId(null)}
+                  />
+                ) : (
+                  <MealPlanCard
+                    plan={plan}
+                    expandedMealId={expandedMealId}
+                    onToggleMeal={setExpandedMealId}
+                    onEdit={() => startEditing(plan)}
+                    onDelete={() => deleteMealPlan(plan.id)}
+                  />
+                )}
+              </article>
+            ))
+          )}
         </section>
       </section>
     </>

@@ -3,17 +3,17 @@ import { useApp } from "../state/AppContext";
 import { AppLink, useRouter } from "../state/RouterContext";
 
 export function LoginPage() {
-  const { isAuthenticated, login } = useApp();
+  const { isAuthenticated, authError, login } = useApp();
   const { navigate } = useRouter();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
 
   if (isAuthenticated) navigate("/");
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    login(name);
-    navigate(name.length > 2 ? "/" : "/profile");
+    const ok = await login(name, password);
+    if (ok) navigate("/");
   }
 
   return (
@@ -40,6 +40,7 @@ export function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
+          {authError ? <p className="form-error">{authError}</p> : null}
           <button className="primary-button" type="submit" disabled={!name || !password}>
             Continue
           </button>

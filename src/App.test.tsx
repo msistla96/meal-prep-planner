@@ -6,6 +6,7 @@ import { renderWithProviders } from "./test/renderWithProviders";
 
 async function login() {
   const user = userEvent.setup();
+  await screen.findByLabelText("Name");
   await user.type(screen.getByLabelText("Name"), "Meena");
   await user.type(screen.getByLabelText("Password"), "password");
   await user.click(screen.getByRole("button", { name: /continue/i }));
@@ -16,7 +17,7 @@ describe("Meal Prep Planner frontend", () => {
   it("starts at login and routes to the home dashboard", async () => {
     renderWithProviders(<App />, "/");
 
-    expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /sign in/i })).toBeInTheDocument();
 
     await login();
 
@@ -29,7 +30,7 @@ describe("Meal Prep Planner frontend", () => {
     renderWithProviders(<App />, "/signup");
     const user = userEvent.setup();
 
-    expect(screen.getByRole("heading", { name: /create account/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /create account/i })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("Name"), "Priya");
     await user.type(screen.getByLabelText("Email"), "priya@example.com");
@@ -41,8 +42,8 @@ describe("Meal Prep Planner frontend", () => {
     expect(screen.queryByLabelText("Primary navigation")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Agent chat widget")).not.toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Gender"));
     expect(screen.getByRole("button", { name: /save profile/i })).toBeDisabled();
+    await user.type(screen.getByLabelText("Age"), "29");
     await user.type(screen.getByLabelText("Gender"), "Female");
     expect(screen.getByRole("button", { name: /save profile/i })).toBeEnabled();
 

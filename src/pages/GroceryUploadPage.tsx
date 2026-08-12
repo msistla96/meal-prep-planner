@@ -12,19 +12,7 @@ export function GroceryUploadPage() {
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!listName.trim() || !fileName) return;
-    createGroceryList({
-      name: listName.trim(),
-      source: "PDF",
-      items: [
-        {
-          name: "Imported item",
-          quantity: "Review",
-          type: "Imported",
-          expiryDate: "",
-          purchaseDate: ""
-        }
-      ]
-    });
+    createGroceryList({ name: listName.trim(), source: "PDF" });
     navigate("/grocery-lists", { replace: true });
   }
 

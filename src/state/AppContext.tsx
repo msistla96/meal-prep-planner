@@ -2,15 +2,12 @@ import {
   createContext,
   type ReactNode,
   useContext,
+  useEffect,
   useMemo,
   useState
 } from "react";
-import {
-  initialGroceryLists,
-  initialMealPlans,
-  initialMessages,
-  initialProfile
-} from "../data/mockData";
+import { api, ApiError } from "./api";
+import { initialMessages } from "../data/mockData";
 import type {
   ChatMessage,
   GroceryItem,
@@ -19,176 +16,249 @@ import type {
   UserProfile
 } from "../types";
 
+const emptyProfile: UserProfile = {
+  name: "",
+  age: "",
+  gender: "",
+  lifestyle: "Semi active",
+  allergies: "",
+  cuisines: "",
+  proteins: "",
+  dietType: ""
+};
+
 type AppState = {
+  isLoading: boolean;
   isAuthenticated: boolean;
   profileComplete: boolean;
   shouldOpenAgentOnShell: boolean;
+  authError: string | null;
   profile: UserProfile;
   mealPlans: MealPlan[];
   groceryLists: GroceryList[];
   messages: ChatMessage[];
-  login: (name: string) => void;
-  signup: (name: string) => void;
+  login: (name: string, password: string) => Promise<boolean>;
+  signup: (name: string, password: string) => Promise<boolean>;
   clearAgentShellPrompt: () => void;
   logout: () => void;
-  saveProfile: (profile: UserProfile) => void;
-  createMealPlan: (name?: string) => void;
-  deleteMealPlan: (id: string) => void;
-  createGroceryList: (list: Pick<GroceryList, "name" | "source"> & { items?: Omit<GroceryItem, "id">[] }) => void;
-  updateGroceryList: (id: string, updates: Pick<GroceryList, "name" | "source">) => void;
-  deleteGroceryList: (id: string) => void;
-  addGroceryItem: (listId: string, item: Omit<GroceryItem, "id">) => void;
-  sendAgentMessage: (content: string) => void;
+  saveProfile: (profile: UserProfile) => Promise<void>;
+  createMealPlan: (name?: string) => Promise<void>;
+  updateMealPlan: (id: string, updates: Partial<Pick<MealPlan, "name" | "date" | "meals">>) => Promise<void>;
+  deleteMealPlan: (id: string) => Promise<void>;
+  createGroceryList: (list: Pick<GroceryList, "name" | "source">) => Promise<string>;
+  updateGroceryList: (id: string, updates: Pick<GroceryList, "name" | "source">) => Promise<void>;
+  deleteGroceryList: (id: string) => Promise<void>;
+  addGroceryItem: (listId: string, item: Omit<GroceryItem, "id">) => Promise<void>;
+  sendAgentMessage: (content: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
-const today = "2026-08-02";
-
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setAuthenticated] = useState(false);
-  const [profileComplete, setProfileComplete] = useState(true);
+  const [profileComplete, setProfileComplete] = useState(false);
   const [shouldOpenAgentOnShell, setShouldOpenAgentOnShell] = useState(false);
-  const [profile, setProfile] = useState(initialProfile);
-  const [mealPlans, setMealPlans] = useState(initialMealPlans);
-  const [groceryLists, setGroceryLists] = useState(initialGroceryLists);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile>(emptyProfile);
+  const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
+  const [groceryLists, setGroceryLists] = useState<GroceryList[]>([]);
   const [messages, setMessages] = useState(initialMessages);
+
+  async function loadAppData() {
+    const [plans, lists] = await Promise.all([
+      api<{ mealPlans: MealPlan[] }>("/meal-plans"),
+      api<{ groceryLists: GroceryList[] }>("/grocery-lists")
+    ]);
+    setMealPlans(plans.mealPlans);
+    setGroceryLists(lists.groceryLists);
+  }
+
+  // Restore an existing session cookie on first load.
+  useEffect(() => {
+    api<{ profile: UserProfile; profileComplete: boolean }>("/profile")
+      .then(async (data) => {
+        setAuthenticated(true);
+        setProfile(data.profile);
+        setProfileComplete(data.profileComplete);
+        await loadAppData();
+      })
+      .catch(() => setAuthenticated(false))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  async function login(name: string, password: string) {
+    setAuthError(null);
+    try {
+      const data = await api<{ profile: UserProfile; profileComplete: boolean }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ name, password })
+      });
+      setAuthenticated(true);
+      setProfile(data.profile);
+      setProfileComplete(data.profileComplete);
+      setShouldOpenAgentOnShell(data.profileComplete);
+      await loadAppData();
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof ApiError ? error.message : "Login failed");
+      return false;
+    }
+  }
+
+  async function signup(name: string, password: string) {
+    setAuthError(null);
+    try {
+      const data = await api<{ profile: UserProfile; profileComplete: boolean }>("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify({ name, password })
+      });
+      setAuthenticated(true);
+      setProfile(data.profile);
+      setProfileComplete(data.profileComplete);
+      setShouldOpenAgentOnShell(false);
+      await loadAppData();
+      return true;
+    } catch (error) {
+      setAuthError(error instanceof ApiError ? error.message : "Signup failed");
+      return false;
+    }
+  }
+
+  function logout() {
+    api("/auth/logout", { method: "POST" }).finally(() => {
+      setAuthenticated(false);
+      setShouldOpenAgentOnShell(false);
+      setProfile(emptyProfile);
+      setMealPlans([]);
+      setGroceryLists([]);
+    });
+  }
+
+  async function saveProfile(nextProfile: UserProfile) {
+    const data = await api<{ profile: UserProfile; profileComplete: boolean }>("/profile", {
+      method: "PUT",
+      body: JSON.stringify(nextProfile)
+    });
+    setProfile(data.profile);
+    setProfileComplete(data.profileComplete);
+    setShouldOpenAgentOnShell(true);
+  }
+
+  async function createMealPlan(name = "New agent meal plan") {
+    const data = await api<{ mealPlan: MealPlan }>("/meal-plans", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        date: new Date().toISOString().slice(0, 10),
+        meals: [
+          {
+            name: "Protein bowl",
+            cuisine: profile.cuisines.split(",")[0] || "Custom",
+            servings: 2,
+            ingredients: ["Grain", "Protein", "Vegetables"],
+            recipe: ["Prep base", "Cook protein", "Assemble bowls"]
+          }
+        ]
+      })
+    });
+    setMealPlans((plans) => [data.mealPlan, ...plans]);
+  }
+
+  async function updateMealPlan(id: string, updates: Partial<Pick<MealPlan, "name" | "date" | "meals">>) {
+    const data = await api<{ mealPlan: MealPlan }>(`/meal-plans/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
+    setMealPlans((plans) => plans.map((plan) => (plan.id === id ? data.mealPlan : plan)));
+  }
+
+  async function deleteMealPlan(id: string) {
+    await api(`/meal-plans/${id}`, { method: "DELETE" });
+    setMealPlans((plans) => plans.filter((plan) => plan.id !== id));
+  }
+
+  async function createGroceryList({ name, source }: Pick<GroceryList, "name" | "source">) {
+    const data = await api<{ groceryList: GroceryList }>("/grocery-lists", {
+      method: "POST",
+      body: JSON.stringify({ name, source })
+    });
+    setGroceryLists((lists) => [data.groceryList, ...lists]);
+    return data.groceryList.id;
+  }
+
+  async function updateGroceryList(id: string, updates: Pick<GroceryList, "name" | "source">) {
+    const data = await api<{ groceryList: GroceryList }>(`/grocery-lists/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates)
+    });
+    setGroceryLists((lists) => lists.map((list) => (list.id === id ? data.groceryList : list)));
+  }
+
+  async function deleteGroceryList(id: string) {
+    await api(`/grocery-lists/${id}`, { method: "DELETE" });
+    setGroceryLists((lists) => lists.filter((list) => list.id !== id));
+  }
+
+  async function addGroceryItem(listId: string, item: Omit<GroceryItem, "id">) {
+    const data = await api<{ groceryList: GroceryList }>(`/grocery-lists/${listId}/items`, {
+      method: "POST",
+      body: JSON.stringify(item)
+    });
+    setGroceryLists((lists) => lists.map((list) => (list.id === listId ? data.groceryList : list)));
+  }
+
+  async function sendAgentMessage(content: string) {
+    setMessages((current) => [...current, { id: `msg-${current.length + 1}`, role: "user", content }]);
+
+    try {
+      const data = await api<{ reply: string }>("/agent", {
+        method: "POST",
+        body: JSON.stringify({ content })
+      });
+      setMessages((current) => [...current, { id: `msg-${current.length + 1}`, role: "agent", content: data.reply }]);
+      // The agent may have created/edited/deleted meal plans, grocery lists,
+      // or the profile as tool calls — refetch rather than guessing the diff.
+      await Promise.all([loadAppData(), api<{ profile: UserProfile; profileComplete: boolean }>("/profile").then((data) => {
+        setProfile(data.profile);
+        setProfileComplete(data.profileComplete);
+      })]);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "The agent didn't respond in time.";
+      setMessages((current) => [...current, { id: `msg-${current.length + 1}`, role: "agent", content: message }]);
+    }
+  }
 
   const value = useMemo<AppState>(
     () => ({
+      isLoading,
       isAuthenticated,
       profileComplete,
       shouldOpenAgentOnShell,
+      authError,
       profile,
       mealPlans,
       groceryLists,
       messages,
-      login: (name: string) => {
-        setAuthenticated(true);
-        setProfile((current) => ({ ...current, name: name || current.name }));
-        setProfileComplete(Boolean(name && name.length > 2));
-        setShouldOpenAgentOnShell(Boolean(name && name.length > 2));
-      },
-      signup: (name: string) => {
-        setAuthenticated(true);
-        setProfile((current) => ({ ...current, name: name || current.name }));
-        setProfileComplete(false);
-        setShouldOpenAgentOnShell(false);
-      },
+      login,
+      signup,
       clearAgentShellPrompt: () => setShouldOpenAgentOnShell(false),
-      logout: () => {
-        setAuthenticated(false);
-        setShouldOpenAgentOnShell(false);
-      },
-      saveProfile: (nextProfile: UserProfile) => {
-        setProfile(nextProfile);
-        setProfileComplete(true);
-        setShouldOpenAgentOnShell(true);
-      },
-      createMealPlan: (name = "New agent meal plan") => {
-        setMealPlans((plans) => [
-          {
-            id: `plan-${plans.length + 1}`,
-            name,
-            date: today,
-            meals: [
-              {
-                id: `meal-${plans.length + 1}`,
-                name: "Protein bowl",
-                cuisine: profile.cuisines.split(",")[0] || "Custom",
-                servings: 2,
-                ingredients: ["Grain", "Protein", "Vegetables"],
-                recipe: ["Prep base", "Cook protein", "Assemble bowls"]
-              }
-            ]
-          },
-          ...plans
-        ]);
-      },
-      deleteMealPlan: (id: string) => {
-        setMealPlans((plans) => plans.filter((plan) => plan.id !== id));
-      },
-      createGroceryList: ({ name, source, items = [] }) => {
-        setGroceryLists((lists) => [
-          {
-            id: `grocery-${Date.now()}`,
-            name,
-            source,
-            created: today,
-            updated: today,
-            items: items.map((nextItem, index) => ({
-              ...nextItem,
-              id: `item-${Date.now()}-${index + 1}`
-            }))
-          },
-          ...lists
-        ]);
-      },
-      updateGroceryList: (id: string, updates: Pick<GroceryList, "name" | "source">) => {
-        setGroceryLists((lists) =>
-          lists.map((list) =>
-            list.id === id ? { ...list, ...updates, updated: today } : list
-          )
-        );
-      },
-      deleteGroceryList: (id: string) => {
-        setGroceryLists((lists) => lists.filter((list) => list.id !== id));
-      },
-      addGroceryItem: (listId: string, item: Omit<GroceryItem, "id">) => {
-        setGroceryLists((lists) =>
-          lists.map((list) =>
-            list.id === listId
-              ? {
-                  ...list,
-                  updated: today,
-                  items: [
-                    ...list.items,
-                    { ...item, id: `item-${list.items.length + 1}` }
-                  ]
-                }
-              : list
-          )
-        );
-      },
-      sendAgentMessage: (content: string) => {
-        const lowered = content.toLowerCase();
-        const agentContent = lowered.includes("meal")
-          ? "I drafted a meal plan using your proteins, cuisines, and current groceries."
-          : lowered.includes("grocery")
-            ? "Your grocery list has spinach and yogurt expiring soon. Add vegetables for two more dinners."
-            : "I can help with meal plans, grocery lists, or profile changes.";
-
-        setMessages((current) => [
-          ...current,
-          { id: `msg-${current.length + 1}`, role: "user", content },
-          { id: `msg-${current.length + 2}`, role: "agent", content: agentContent }
-        ]);
-
-        if (lowered.includes("create") && lowered.includes("meal")) {
-          setMealPlans((plans) => [
-            {
-              id: `plan-${plans.length + 1}`,
-              name: "Agent generated plan",
-              date: today,
-              meals: [
-                {
-                  id: `meal-${plans.length + 1}`,
-                  name: "Paneer rice bowl",
-                  cuisine: "Indian",
-                  servings: 2,
-                  ingredients: ["Paneer", "Rice", "Spinach"],
-                  recipe: ["Cook rice", "Sear paneer", "Assemble with greens"]
-                }
-              ]
-            },
-            ...plans
-          ]);
-        }
-      }
+      logout,
+      saveProfile,
+      createMealPlan,
+      updateMealPlan,
+      deleteMealPlan,
+      createGroceryList,
+      updateGroceryList,
+      deleteGroceryList,
+      addGroceryItem,
+      sendAgentMessage
     }),
     [
-      groceryLists,
+      isLoading,
       isAuthenticated,
+      authError,
+      groceryLists,
       mealPlans,
       messages,
       profile,

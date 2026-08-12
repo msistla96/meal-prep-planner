@@ -17,9 +17,10 @@ import { useApp } from "./state/AppContext";
 import { useRouter } from "./state/RouterContext";
 
 export function App() {
-  const { isAuthenticated, profileComplete } = useApp();
+  const { isLoading, isAuthenticated, profileComplete } = useApp();
   const { path } = useRouter();
 
+  if (isLoading) return null;
   if (!isAuthenticated) return path === "/signup" ? <SignupPage /> : <LoginPage />;
   if (!profileComplete) return <ProfilePage standalone />;
 

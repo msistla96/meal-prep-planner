@@ -527,7 +527,8 @@ N/A
 
 ### Missing from Agent implementation
 
-- Sign in page accepts dummy values
-- Grocery list and grocery item are two different things, but are mixed up. 
+- Sign in page accepts dummy values 
 - Backend is still not setup yet; Front end is not fully complete.
 - Need a walkthrough/tutorial of code generated before backend is generated.
+- Colour scheme changes. Make Edit buttons less clumsy. 
+- Some of User Profile fields like Cuisine, Proteins are not drop down lists or multiple checkboxes.

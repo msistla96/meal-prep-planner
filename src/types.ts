@@ -1,5 +1,3 @@
-export type ViewMode = "day" | "week" | "month";
-
 export type UserProfile = {
   name: string;
   age: string;
